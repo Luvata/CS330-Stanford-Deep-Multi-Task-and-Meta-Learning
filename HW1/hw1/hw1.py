@@ -28,6 +28,10 @@ def loss_function(preds, labels):
     """
     #############################
     #### YOUR CODE GOES HERE ####
+
+    preds_last_N_steps = preds[:, -1:].squeeze(1)  # B, N, N
+    labels_last_N_steps = labels[:, -1:].squeeze(1) # B, N, N
+    # TODO: Calculate cross entropy loss for batches
     pass
     #############################
 
@@ -52,6 +56,20 @@ class MANN(tf.keras.Model):
         """
         #############################
         #### YOUR CODE GOES HERE ####
+
+        # 1. stack label information to first K x N step
+        B, K_plus_one, N, N = input_labels.shape
+        inp_labels = input_images[:, :-1].reshape(B, K_plus_one * N, -1)
+        inp_imgs = labels[:, :-1].reshape(B, K_plus_one*N, -1)
+        # 2. 0 as label information from K * N th step
+        inp_imgs[:, -N:] = 0
+        inp = np.dstack((inp_labels, inp_imgs))
+        # 3. LSTM input shape: (B, (K+1) x N, 784 + N)
+        out = self.layer1(inp)
+        out = self.layer2(out)
+        # TODO: go through softmax here
+        # 4. LSTM output shape: (B, (K+1) x N, N) -> Reshape (B, K+1, N, N)
+        out = out.reshape(B, K_plus_one, N, N)
         pass
         #############################
         return out
