@@ -4,6 +4,7 @@ import tensorflow as tf
 from load_data import DataGenerator
 from tensorflow.python.platform import flags
 from tensorflow.keras import layers
+import pdb
 
 FLAGS = flags.FLAGS
 
@@ -31,8 +32,8 @@ def loss_function(preds, labels):
 
     preds_last_N_steps = preds[:, -1:].squeeze(1)  # B, N, N
     labels_last_N_steps = labels[:, -1:].squeeze(1) # B, N, N
-    # TODO: Calculate cross entropy loss for batches
-    pass
+    loss = tf.losses.softmax_cross_entropy(labels_last_N_steps, preds_last_N_steps)
+    return loss
     #############################
 
 
@@ -58,18 +59,18 @@ class MANN(tf.keras.Model):
         #### YOUR CODE GOES HERE ####
 
         # 1. stack label information to first K x N step
-        B, K_plus_one, N, N = input_labels.shape
-        inp_labels = input_images[:, :-1].reshape(B, K_plus_one * N, -1)
-        inp_imgs = labels[:, :-1].reshape(B, K_plus_one*N, -1)
+        B, K_plus_one, N, N = tf.shape(input_labels)
+        inp_images = tf.reshape(input_images, (B, K_plus_one * N, -1))
+        inp_labels = tf.reshape(labels, (B, K_plus_one*N, -1))
         # 2. 0 as label information from K * N th step
-        inp_imgs[:, -N:] = 0
-        inp = np.dstack((inp_labels, inp_imgs))
+        inp_labels[:, -N:] = 0
+        inp = tf.stack((inp_images, inp_labels), dim=2)
         # 3. LSTM input shape: (B, (K+1) x N, 784 + N)
         out = self.layer1(inp)
         out = self.layer2(out)
-        # TODO: go through softmax here
+        # out = tf.nn.softmax(out)
         # 4. LSTM output shape: (B, (K+1) x N, N) -> Reshape (B, K+1, N, N)
-        out = out.reshape(B, K_plus_one, N, N)
+        out = tf.reshape(out, B, K_plus_one, N, N)
         pass
         #############################
         return out
@@ -95,6 +96,7 @@ with tf.Session() as sess:
 
     for step in range(50000):
         i, l = data_generator.sample_batch('train', FLAGS.meta_batch_size)
+        tf.print(">>>>>>>", i.shape, l.shape)
         feed = {ims: i.astype(np.float32), labels: l.astype(np.float32)}
         _, ls = sess.run([optimizer_step, loss], feed)
 
