@@ -122,7 +122,7 @@ class DataGenerator(object):
             all_label_batches.append(labels)
 
         # 3. Return two numpy array (B, K, N, 784) and one-hot labels (B, K, N, N)
-        all_image_batches = np.stack(all_image_batches)
-        all_label_batches = np.stack(all_label_batches)
+        all_image_batches = np.stack(all_image_batches).astype(np.float32)
+        all_label_batches = np.stack(all_label_batches).astype(np.float32)
         #############################
         return all_image_batches, all_label_batches
