@@ -21,8 +21,8 @@ class MANN(nn.Module):
         self.num_classes = num_classes
         self.sample_per_classes = sample_per_class
         self.embed_size = embed_size
-        self.lstm1 = nn.LSTM(embed_size + num_classes, 128, bidirectional=True)
-        self.lstm2 = nn.LSTM(128 * 2, num_classes)
+        self.lstm1 = nn.LSTM(embed_size + num_classes, 128)
+        self.lstm2 = nn.LSTM(128, num_classes)
 
     def forward(self, input_images, input_labels):
         # B, K+1, N, 784: input_images

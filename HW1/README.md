@@ -7,6 +7,7 @@ Since I'm not familiar with TF, I try to implement Problem 2 in pytorch. I also 
 - [x] Problem 2: Memory Augmented Neural Networks [2, 3]
     - [x] Implement in Pytorch
     - [ ] Refactor DataLoader
+    - [ ] Add support cuda
     - [ ] Refactor episode phase and predict phase
 - [ ] Problem 3: Analysis
 - [ ] Problem 4: Experimentation

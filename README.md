@@ -1,5 +1,4 @@
 # CS330: Deep Multi-Task and Meta Learning (Stanford Fall 2019)
------
 
 My course notes & assignment solutions for CS330
 
