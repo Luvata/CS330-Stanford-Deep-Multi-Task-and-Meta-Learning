@@ -1,10 +1,7 @@
 import numpy as np
-import random
 import tensorflow as tf
 from load_data import DataGenerator
 from tensorflow.python.platform import flags
-from tensorflow.keras import layers
-import pdb
 
 FLAGS = flags.FLAGS
 

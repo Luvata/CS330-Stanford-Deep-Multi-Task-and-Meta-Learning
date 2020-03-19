@@ -2,12 +2,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from load_data import DataGenerator
+from load_data import DataGeneratorPreFetch
 from tensorflow.python.platform import flags
 
-
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer(
@@ -24,8 +21,8 @@ class MANN(nn.Module):
         self.num_classes = num_classes
         self.sample_per_classes = sample_per_class
         self.embed_size = embed_size
-        self.lstm1 = nn.LSTM(embed_size + num_classes, 128)
-        self.lstm2 = nn.LSTM(128, num_classes)
+        self.lstm1 = nn.LSTM(embed_size + num_classes, 128, bidirectional=True)
+        self.lstm2 = nn.LSTM(128 * 2, num_classes)
 
     def forward(self, input_images, input_labels):
         # B, K+1, N, 784: input_images
@@ -33,7 +30,7 @@ class MANN(nn.Module):
         B, k_plus_one, N, N = input_labels.shape
         input_images = input_images.reshape(B, -1, self.embed_size)
         input_labels = input_labels.reshape(B, -1, N)
-        input_labels[:, -1:] = 0.
+        input_labels[:, -self.num_classes:] = 0.
         x = torch.tensor(np.dstack((input_images, input_labels))).transpose(0, 1)  # (K+1)*N, B, N
         x, _ = self.lstm1(x)
         x, _ = self.lstm2(x)
@@ -41,14 +38,13 @@ class MANN(nn.Module):
 
 
 def main():
-    data_generator = DataGenerator(
+    data_generator = DataGeneratorPreFetch(
         FLAGS.num_classes, FLAGS.num_samples + 1)
 
     model = MANN(FLAGS.num_classes, FLAGS.num_samples + 1)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-    n_step = 1000
+    n_step = 2000
     test_accs = []
 
     for step in range(n_step):
@@ -63,11 +59,10 @@ def main():
         loss = criterion(last_n_step_logits, target)
         loss.backward()
         optimizer.step()
-
         if step % 100 == 0:
             with torch.no_grad():
                 print("*" * 5 + "Iter " + str(step) + "*" * 5)
-                images, labels = data_generator.sample_batch('test', FLAGS.meta_batch_size)
+                images, labels = data_generator.sample_batch('test', 100)
                 last_n_step_labels = labels[:, -1:]
                 last_n_step_labels = last_n_step_labels.squeeze(1).reshape(-1, FLAGS.num_classes)  # (B * N, N)
                 target = torch.tensor(last_n_step_labels.argmax(axis=1))
