@@ -11,3 +11,8 @@ Since I'm not familiar with TF, I try to implement Problem 2 in pytorch. I also 
     - [ ] Refactor episode phase and predict phase
 - [ ] Problem 3: Analysis
 - [ ] Problem 4: Experimentation
+
+- By using CNN as feature extractor and adding dropout, I got accuracy ~ 0.7 on 1 shot 5 ways :D
+
+`python hw1_pytorch_cnn.py --num_classes=5 --num_samples=1 --meta_batch_size=64`
+![image](cnn_dropout.png)
