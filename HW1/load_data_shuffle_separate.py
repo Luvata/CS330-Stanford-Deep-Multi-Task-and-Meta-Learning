@@ -1,11 +1,9 @@
 from glob import glob
-
 import numpy as np
 import os
 import random
-import tensorflow as tf
-from scipy import misc
 import imageio
+from sklearn.utils import shuffle
 
 
 def get_images(paths, labels, nb_samples=None, shuffle=True):
@@ -110,15 +108,26 @@ class DataGenerator(object):
             # 1. Sample N from folders
             select_classes = random.sample(folders, self.num_classes)
             # 2. Load K images of each N classes -> Total K x N images
-            images = []
-            labels = []
             one_hot_labels = np.identity(self.num_classes)  # Identity matrix, shape N, N
-            for label, img_path in get_images(select_classes, one_hot_labels, self.num_samples_per_class, shuffle=True):
-                images.append(image_file_to_array(img_path, 784))
-                labels.append(label)
+            # SHOULD NOT set shuffle=True here !
+            labels_images = get_images(select_classes, one_hot_labels, self.num_samples_per_class, shuffle=False)
+            train_images, train_labels = [], []
+            test_images, test_labels = [], []
+            for sample_idx, (label, img_path) in enumerate(labels_images):
+                # Take the first image of each class (index is 0, N, 2N...) to test_set
+                if sample_idx % self.num_samples_per_class == 0:
+                    test_images.append(image_file_to_array(img_path, 784))
+                    test_labels.append(label)
+                else:
+                    train_images.append(image_file_to_array(img_path, 784))
+                    train_labels.append(label)
 
-            labels = np.vstack(labels).reshape((-1, self.num_classes, self.num_classes))  # K, N, N
-            images = np.vstack(images).reshape((self.num_samples_per_class, self.num_classes, -1))  # K x N x 784
+            ## Now we shuffle train & test, then concatenate them together
+            train_images, train_labels = shuffle(train_images, train_labels)
+            test_images, test_labels = shuffle(test_images, test_labels)
+
+            labels = np.vstack(train_labels + test_labels).reshape((-1, self.num_classes, self.num_classes))  # K, N, N
+            images = np.vstack(train_images + test_images).reshape((self.num_samples_per_class, self.num_classes, -1))  # K x N x 784
 
             all_image_batches.append(images)
             all_label_batches.append(labels)
@@ -133,6 +142,7 @@ class DataGenerator(object):
 class DataGeneratorPreFetch(object):
     def __init__(self, num_classes, num_samples_per_class, config={}):
         """
+        Similar to DataGenerator, but load all images to ram for faster IO
         Args:
             num_classes: Number of classes for classification (K-way)
             num_samples_per_class: num samples to generate per class in one batch
@@ -200,13 +210,22 @@ class DataGeneratorPreFetch(object):
             # 1. Sample N from folders
             select_classes = random.sample(list(images_dict.keys()), self.num_classes)
             # 2. Load K images of each N classes -> Total K x N images
-            images = []
-            labels = []
-            for label, image in self.get_images_prefetch(select_classes, images_dict, self.num_samples_per_class, shuffle=True):
-                images.append(image)
-                labels.append(label)
-            labels = np.vstack(labels).reshape((-1, self.num_classes, self.num_classes))  # K, N, N
-            images = np.vstack(images).reshape((self.num_samples_per_class, self.num_classes, -1))  # K x N x 784
+            labels_images = self.get_images_prefetch(select_classes, images_dict, self.num_samples_per_class, shuffle=False)
+            train_images, train_labels = [], []
+            test_images, test_labels = [], []
+            for sample_idx, (label, image) in enumerate(labels_images):
+                if (sample_idx + 1) % self.num_samples_per_class:
+                    test_images.append(image)
+                    test_labels.append(label)
+                else:
+                    train_images.append(image)
+                    train_labels.append(label)
+            train_images, train_labels = shuffle(train_images, train_labels)
+            test_images, test_labels = shuffle(test_images, test_labels)
+
+            labels = np.vstack(train_labels + test_labels).reshape((-1, self.num_classes, self.num_classes))  # K, N, N
+            images = np.vstack(train_images + test_images).\
+                reshape((self.num_samples_per_class, self.num_classes, -1))  # K x N x 784
 
             all_image_batches.append(images)
             all_label_batches.append(labels)
