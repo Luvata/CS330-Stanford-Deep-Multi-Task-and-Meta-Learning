@@ -214,7 +214,7 @@ class DataGeneratorPreFetch(object):
             train_images, train_labels = [], []
             test_images, test_labels = [], []
             for sample_idx, (label, image) in enumerate(labels_images):
-                if (sample_idx + 1) % self.num_samples_per_class:
+                if sample_idx % self.num_samples_per_class:
                     test_images.append(image)
                     test_labels.append(label)
                 else:

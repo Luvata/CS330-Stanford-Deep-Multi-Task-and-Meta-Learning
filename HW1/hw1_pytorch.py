@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from load_data import DataGeneratorPreFetch
+from load_data_shuffle_separate import DataGenerator
 from tensorflow.python.platform import flags
 
 
@@ -24,12 +24,13 @@ class MANN(nn.Module):
         self.lstm1 = nn.LSTM(embed_size + num_classes, 128)
         self.lstm2 = nn.LSTM(128, num_classes)
 
-    def forward(self, input_images, input_labels):
+    def forward(self, input_images, raw_input_labels):
         # B, K+1, N, 784: input_images
         # B, K+1, N, N: input_labels
-        B, k_plus_one, N, N = input_labels.shape
+        B, k_plus_one, N, N = raw_input_labels.shape
         input_images = input_images.reshape(B, -1, self.embed_size)
-        input_labels = input_labels.reshape(B, -1, N)
+        # Be careful, this can modify raw_input_labels if we forget copy
+        input_labels = raw_input_labels.copy().reshape(B, -1, N)
         input_labels[:, -self.num_classes:] = 0.
         x = torch.tensor(np.dstack((input_images, input_labels))).transpose(0, 1)  # (K+1)*N, B, N
         x, _ = self.lstm1(x)
@@ -38,7 +39,7 @@ class MANN(nn.Module):
 
 
 def main():
-    data_generator = DataGeneratorPreFetch(
+    data_generator = DataGenerator(
         FLAGS.num_classes, FLAGS.num_samples + 1)
 
     model = MANN(FLAGS.num_classes, FLAGS.num_samples + 1)
@@ -49,7 +50,7 @@ def main():
 
     for step in range(n_step):
         images, labels = data_generator.sample_batch('train', FLAGS.meta_batch_size)
-        last_n_step_labels = labels[:, -1:]
+        last_n_step_labels = labels[:, -1:].copy()
         last_n_step_labels = last_n_step_labels.squeeze(1).reshape(-1, FLAGS.num_classes)  # (B * N, N)
         target = torch.tensor(last_n_step_labels.argmax(axis=1))
         logits = model(images, labels)
@@ -63,7 +64,7 @@ def main():
             with torch.no_grad():
                 print("*" * 5 + "Iter " + str(step) + "*" * 5)
                 images, labels = data_generator.sample_batch('test', 100)
-                last_n_step_labels = labels[:, -1:]
+                last_n_step_labels = labels[:, -1:].copy()
                 last_n_step_labels = last_n_step_labels.squeeze(1).reshape(-1, FLAGS.num_classes)  # (B * N, N)
                 target = torch.tensor(last_n_step_labels.argmax(axis=1))
                 logits = model(images, labels)
