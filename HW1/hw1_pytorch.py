@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.optim as optim
 from load_data import DataGeneratorPreFetch
 from tensorflow.python.platform import flags
+import matplotlib.pyplot as plt
+from torch.utils.tensorboard import SummaryWriter
 
 
 FLAGS = flags.FLAGS
@@ -13,6 +15,7 @@ flags.DEFINE_integer('num_samples', 1,
                      'number of examples used for inner gradient update (K for K-shot learning).')
 flags.DEFINE_integer('meta_batch_size', 16,
                      'Number of N-way classification tasks per batch')
+flags.DEFINE_integer('n_step', 20000, 'Number of training step')
 
 
 class MANN(nn.Module):
@@ -24,65 +27,89 @@ class MANN(nn.Module):
         self.lstm1 = nn.LSTM(embed_size + num_classes, 128)
         self.lstm2 = nn.LSTM(128, num_classes)
 
-    def forward(self, input_images, input_labels):
-        # B, K+1, N, 784: input_images
-        # B, K+1, N, N: input_labels
-        B, k_plus_one, N, N = input_labels.shape
-        input_images = input_images.reshape(B, -1, self.embed_size)
-        input_labels = input_labels.reshape(B, -1, N)
-        input_labels[:, -self.num_classes:] = 0.
-        x = torch.tensor(np.dstack((input_images, input_labels))).transpose(0, 1)  # (K+1)*N, B, N
-        x, _ = self.lstm1(x)
+    def forward(self, inputs):
+        x, _ = self.lstm1(inputs)
         x, _ = self.lstm2(x)
-        return x  # ((K + 1)*N, B, N)
+        return x  # K*N,B,N
+
+
+def prep_data(input_images, input_labels, device):
+    # Handle reshape and data device
+    B, K, N, D = input_images.shape
+    input_images = input_images.reshape(B, -1, D)
+    test_labels = input_labels[:, -1:]  # B,1,N,N
+    train_labels = np.concatenate((input_labels[:, :-1], np.zeros_like(test_labels)), axis=1).reshape((B, -1, N))
+    inputs = torch.tensor(np.dstack((input_images, train_labels))).transpose(0, 1).to(device)
+    targets = torch.tensor(test_labels.squeeze(1).reshape(-1, N).argmax(axis=1)).to(device)
+    return inputs, targets
+
+
+def train(model, data_generator, n_step, optimizer, loss_fn, device, save=True):
+    exp_name = f"_Exp_N={FLAGS.num_classes}_K={FLAGS.num_samples}_B={FLAGS.meta_batch_size}"
+    writer = SummaryWriter(comment=exp_name)
+    test_accs = []
+
+    for step in range(n_step):
+        model.train()
+        images, labels = data_generator.sample_batch('train', FLAGS.meta_batch_size)
+        inputs, targets = prep_data(images, labels, device)
+        logits = model(inputs)
+        last_n_step_logits = logits[-FLAGS.num_classes:].transpose(0, 1).contiguous().view(-1, FLAGS.num_classes)
+        optimizer.zero_grad()
+        loss = loss_fn(last_n_step_logits, targets)
+        loss.backward()
+
+        writer.add_scalar("Loss/Train", loss, step)
+
+        optimizer.step()
+        if step % 100 == 0:
+            test_loss, test_accuracy = evaluate(model, data_generator, step, loss_fn, device)
+            print("Train Loss:", loss.item(), "Test Loss:", test_loss.item())
+            print("Test Accuracy", test_accuracy)
+            test_accs.append(test_accuracy)
+            writer.add_scalar("Loss/Test", test_loss, step)
+            writer.add_scalar("Accuracy/Test", test_accuracy, step)
+
+    plt.plot(range(len(test_accs)), test_accs)
+    plt.xlabel("Step (x 100)")
+    plt.ylabel("Test accuracy")
+    plt.savefig(f"models/train_{exp_name}.png")
+    if save:
+        torch.save(model.state_dict(), f"models/model_{exp_name}")
+    return model
+
+
+def evaluate(model, data_generator, step, loss_fn, device):
+    model.eval()
+    with torch.no_grad():
+        print("*" * 5 + "Iter " + str(step) + "*" * 5)
+        images, labels = data_generator.sample_batch('test', 100)
+        inputs, targets = prep_data(images, labels, device)
+        logits = model(inputs)
+        last_n_step_logits = logits[-FLAGS.num_classes:]. \
+            transpose(0, 1).contiguous().view(-1, FLAGS.num_classes)
+
+        pred = last_n_step_logits.argmax(axis=1)
+        test_loss = loss_fn(last_n_step_logits, targets)
+        test_accuracy = (1.0 * (pred == targets)).mean().cpu().item()
+        return test_loss, test_accuracy
 
 
 def main():
     data_generator = DataGeneratorPreFetch(
         FLAGS.num_classes, FLAGS.num_samples + 1)
 
-    model = MANN(FLAGS.num_classes, FLAGS.num_samples + 1)
+    device = torch.device('cpu')
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        print("Using cuda")
+
+    model = MANN(FLAGS.num_classes, FLAGS.num_samples + 1).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    n_step = 2000
-    test_accs = []
-
-    for step in range(n_step):
-        images, labels = data_generator.sample_batch('train', FLAGS.meta_batch_size)
-        last_n_step_labels = labels[:, -1:]
-        last_n_step_labels = last_n_step_labels.squeeze(1).reshape(-1, FLAGS.num_classes)  # (B * N, N)
-        target = torch.tensor(last_n_step_labels.argmax(axis=1))
-        logits = model(images, labels)
-        last_n_step_logits = logits[-FLAGS.num_classes:].\
-            transpose(0, 1).contiguous().view(-1, FLAGS.num_classes)
-        optimizer.zero_grad()
-        loss = criterion(last_n_step_logits, target)
-        loss.backward()
-        optimizer.step()
-        if step % 100 == 0:
-            with torch.no_grad():
-                print("*" * 5 + "Iter " + str(step) + "*" * 5)
-                images, labels = data_generator.sample_batch('test', 100)
-                last_n_step_labels = labels[:, -1:]
-                last_n_step_labels = last_n_step_labels.squeeze(1).reshape(-1, FLAGS.num_classes)  # (B * N, N)
-                target = torch.tensor(last_n_step_labels.argmax(axis=1))
-                logits = model(images, labels)
-                last_n_step_logits = logits[-FLAGS.num_classes:].\
-                    transpose(0, 1).contiguous().view(-1, FLAGS.num_classes)
-                pred = last_n_step_logits.argmax(axis=1)
-                test_loss = criterion(last_n_step_logits, target)
-
-                print("Train Loss:", loss.item(), "Test Loss:", test_loss.item())
-                test_accuracy = (1.0 * (pred == target)).mean().item()
-                print("Test Accuracy", test_accuracy)
-                test_accs.append(test_accuracy)
-
-    import matplotlib.pyplot as plt
-    plt.plot(range(len(test_accs)), test_accs)
-    plt.xlabel("Step (x 100)")
-    plt.ylabel("Test accuracy")
-    plt.show()
+    train(model, data_generator, FLAGS.n_step, optimizer, criterion, device)
 
 
 if __name__ == '__main__':
     main()
+
