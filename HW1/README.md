@@ -8,20 +8,19 @@
     - [x] Implement in Pytorch
     - [x] Fixed pytorch training error
     - [x] Added support cuda and tensorboard for pytorch
-    - [ ] Fix TF implementation error
-- [ ] Problem 3: Analysis
+    - [x] Fix TF implementation error
+- [x] Problem 3: Analysis
 - [ ] Problem 4: Experimentation
 
 ~~- By using CNN as feature extractor and adding dropout, I got accuracy ~ 0.7 on 1 shot 5 ways~~ Turn out this 
 overwhelming result comes from my bug that I accidentally zero-ing all meta-test labels of `input_labels` in `predict`, then calculate loss 
 on it :scream: 
 
-## Changelog
-- [Update 05/14]: Added cuda training and tensorboard for pytorch
-- [Update 05/13]: Fixed abnormal training result with shuffle separate strategy :beetle: 
-- [Update 04/11]: Revert `load_data` to previous shuffle strategy ~~since new shuffle somehow won't work~~ It **worked**
-- [Update 04/02]: Change `load_data` to shuffle separately the train and test set
-- [Update 03/20]: Added `hw1_pytorch_cnn` with CNN encoder, ~~I got accuracy ~ 0.7 on 1 shot 5 ways, but turn out the 
-training is pretty unstable, my suggest is to use small batch size with more training steps~~ My implementation was wrong
 
+## Problem 3: Training result 
+
+#### Training 
+Follow this [colab](https://colab.research.google.com/drive/1bVR_v0bajtTdNazytj4ai2W6sfD7p6Kr?usp=sharing) for training
+and visualize in tensorboard
 ![Training](output/tensorboard.png)
+

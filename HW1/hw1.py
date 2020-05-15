@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from load_data import DataGenerator
+from load_data import DataGeneratorPreFetch
 from tensorflow.python.platform import flags
 
 FLAGS = flags.FLAGS
@@ -26,16 +26,15 @@ def loss_function(preds, labels):
     """
     #############################
     #### YOUR CODE GOES HERE ####
-
-    preds_last_N_steps = preds[:, -1:].squeeze(1)  # B, N, N
-    labels_last_N_steps = labels[:, -1:].squeeze(1) # B, N, N
+    preds_last_N_steps = preds[:, -1:]
+    labels_last_N_steps = labels[:, -1:]
     loss = tf.losses.softmax_cross_entropy(labels_last_N_steps, preds_last_N_steps)
+    loss = tf.reduce_mean(loss)
     return loss
     #############################
 
 
 class MANN(tf.keras.Model):
-
     def __init__(self, num_classes, samples_per_class):
         super(MANN, self).__init__()
         self.num_classes = num_classes
@@ -54,30 +53,25 @@ class MANN(tf.keras.Model):
         """
         #############################
         #### YOUR CODE GOES HERE ####
-
-        # 1. stack label information to first K x N step
-        B, K_plus_one, N, N = tf.shape(input_labels)
-        inp_images = tf.reshape(input_images, (B, K_plus_one * N, -1))
-        inp_labels = tf.reshape(labels, (B, K_plus_one*N, -1))
-        # 2. 0 as label information from K * N th step
-        inp_labels[:, -N:] = 0
-        inp = tf.stack((inp_images, inp_labels), dim=2)
-        # 3. LSTM input shape: (B, (K+1) x N, 784 + N)
-        out = self.layer1(inp)
-        out = self.layer2(out)
-        # out = tf.nn.softmax(out)
-        # 4. LSTM output shape: (B, (K+1) x N, N) -> Reshape (B, K+1, N, N)
-        out = tf.reshape(out, B, K_plus_one, N, N)
-        pass
+        B, K, N, D = input_images.shape
+        images = tf.reshape(input_images, (-1, K*N, D))
+        labels = tf.reshape(tf.concat(
+            (input_labels[:, :-1], tf.zeros_like(input_labels[:, -1:])), axis=1),  # Zero-out labels of last N examples
+            (-1, K*N, N)  # shape B, K*N, N
+        )
+        inp = tf.concat((images, labels), -1)
+        result = self.layer1(inp)
+        result = self.layer2(result)
+        result = tf.reshape(result, (-1, K, N, N))
         #############################
-        return out
+        return result
 
 ims = tf.placeholder(tf.float32, shape=(
     None, FLAGS.num_samples + 1, FLAGS.num_classes, 784))
 labels = tf.placeholder(tf.float32, shape=(
     None, FLAGS.num_samples + 1, FLAGS.num_classes, FLAGS.num_classes))
 
-data_generator = DataGenerator(
+data_generator = DataGeneratorPreFetch(
     FLAGS.num_classes, FLAGS.num_samples + 1)
 
 o = MANN(FLAGS.num_classes, FLAGS.num_samples + 1)
