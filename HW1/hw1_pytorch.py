@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from load_data import DataGeneratorPreFetch
 from tensorflow.python.platform import flags
@@ -30,7 +31,25 @@ class MANN(nn.Module):
     def forward(self, inputs):
         x, _ = self.lstm1(inputs)
         x, _ = self.lstm2(x)
-        return x  # K*N,B,N
+        last_n_step_logits = x[-self.num_classes:].transpose(0, 1).contiguous().view(-1, self.num_classes)
+        return last_n_step_logits
+
+
+class MANN_Dropout_Bi(nn.Module):
+    def __init__(self, num_classes, sample_per_class, embed_size=784):
+        """This model is a little more complex, but adding dropout regularization it can reach 0.6 on N=5"""
+        super().__init__()
+        self.num_classes = num_classes
+        self.sample_per_classes = sample_per_class
+        self.embed_size = embed_size
+        self.lstm1 = nn.LSTM(embed_size + num_classes, 128, bidirectional=True, dropout=0.5, num_layers=2, bias=True)
+        self.fc = nn.Linear(128*2, num_classes)
+
+    def forward(self, inputs):
+        x, _ = self.lstm1(inputs)
+        x = self.fc(x)
+        last_n_step_logits = x[-self.num_classes:].transpose(0, 1).contiguous().view(-1, self.num_classes)
+        return last_n_step_logits
 
 
 def prep_data(input_images, input_labels, device):
@@ -53,8 +72,7 @@ def train(model, data_generator, n_step, optimizer, loss_fn, device, save=True):
         model.train()
         images, labels = data_generator.sample_batch('train', FLAGS.meta_batch_size)
         inputs, targets = prep_data(images, labels, device)
-        logits = model(inputs)
-        last_n_step_logits = logits[-FLAGS.num_classes:].transpose(0, 1).contiguous().view(-1, FLAGS.num_classes)
+        last_n_step_logits = model(inputs)
         optimizer.zero_grad()
         loss = loss_fn(last_n_step_logits, targets)
         loss.backward()
@@ -85,10 +103,7 @@ def evaluate(model, data_generator, step, loss_fn, device):
         print("*" * 5 + "Iter " + str(step) + "*" * 5)
         images, labels = data_generator.sample_batch('test', 100)
         inputs, targets = prep_data(images, labels, device)
-        logits = model(inputs)
-        last_n_step_logits = logits[-FLAGS.num_classes:]. \
-            transpose(0, 1).contiguous().view(-1, FLAGS.num_classes)
-
+        last_n_step_logits = model(inputs)
         pred = last_n_step_logits.argmax(axis=1)
         test_loss = loss_fn(last_n_step_logits, targets)
         test_accuracy = (1.0 * (pred == targets)).mean().cpu().item()
