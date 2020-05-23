@@ -162,6 +162,7 @@ if __name__ == '__main__':
     for batch_images, batch_labels in zip(all_imgs, all_labels):
         train_imgs, test_imgs = batch_images[:, :K].reshape(-1, 28, 28), batch_images[:, K:].reshape(-1, 28, 28)
         ## Max on each row is label, so shape is (N*K, N)
+        print(batch_labels.shape)
         train_labels, test_labels = batch_labels[:, :K].reshape(-1, N).argmax(axis=1), \
                                     batch_labels[:, K:].reshape(-1, N).argmax(axis=1)
         for i in range(N*K):

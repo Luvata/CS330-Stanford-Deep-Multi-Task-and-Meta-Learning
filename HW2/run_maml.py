@@ -69,10 +69,10 @@ def meta_train(model, saver, sess, exp_string, data_generator, resume_itr=0):
         # group a (inputa, labela) and group b (inputb, labelb)
         all_images, all_labels = data_generator.sample_batch('meta_train', FLAGS.meta_batch_size)
         inputa, inputb, labela, labelb = None, None, None, None
-        inputa = all_images[:, :FLAGS.k_shot]
-        inputb = all_images[:, FLAGS.k_shot:]
-        labela = all_labels[:, :FLAGS.k_shot]
-        labelb = all_labels[:, FLAGS.k_shot:]
+        inputa = all_images[:, :, :FLAGS.k_shot]
+        labela = all_labels[:, :, :FLAGS.k_shot]
+        inputb = all_images[:, :, FLAGS.k_shot:]
+        labelb = all_labels[:, :, FLAGS.k_shot:]
         #############################
         feed_dict = {model.inputa: inputa, model.inputb: inputb, model.labela: labela, model.labelb: labelb}
 
@@ -108,10 +108,10 @@ def meta_train(model, saver, sess, exp_string, data_generator, resume_itr=0):
 
             inputa, inputb, labela, labelb = None, None, None, None
             all_images, all_labels = data_generator.sample_batch('meta_val', FLAGS.meta_batch_size)
-            inputa = all_images[:, :FLAGS.k_shot]
-            inputb = all_images[:, FLAGS.k_shot:]
-            labela = all_labels[:, :FLAGS.k_shot]
-            labelb = all_labels[:, FLAGS.k_shot:]
+            inputa = all_images[:, :, :FLAGS.k_shot]
+            inputb = all_images[:, :, FLAGS.k_shot:]
+            labela = all_labels[:, :, :FLAGS.k_shot]
+            labelb = all_labels[:, :, FLAGS.k_shot:]
             #############################
             feed_dict = {model.inputa: inputa, model.inputb: inputb, model.labela: labela, model.labelb: labelb,
                          model.meta_lr: 0.0}
@@ -145,10 +145,10 @@ def meta_test(model, saver, sess, exp_string, data_generator, meta_test_num_inne
 
         inputa, inputb, labela, labelb = None, None, None, None
         all_images, all_labels = data_generator.sample_batch('meta_test', FLAGS.meta_batch_size)
-        inputa = all_images[:, :FLAGS.k_shot]
-        inputb = all_images[:, FLAGS.k_shot:]
-        labela = all_labels[:, :FLAGS.k_shot]
-        labelb = all_labels[:, FLAGS.k_shot:]
+        inputa = all_images[:, :, :FLAGS.k_shot]
+        inputb = all_images[:, :, FLAGS.k_shot:]
+        labela = all_labels[:, :, :FLAGS.k_shot]
+        labelb = all_labels[:, :, FLAGS.k_shot:]
 
         #############################
         feed_dict = {model.inputa: inputa, model.inputb: inputb, model.labela: labela, model.labelb: labelb,

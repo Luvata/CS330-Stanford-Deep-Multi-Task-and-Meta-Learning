@@ -4,6 +4,7 @@ import tensorflow as tf
 
 from tensorflow.python.platform import flags
 from utils import xent, conv_block
+from tensorflow.metrics import accuracy
 
 FLAGS = flags.FLAGS
 
@@ -55,7 +56,7 @@ class MAML:
 					Perform gradient descent for one task in the meta-batch (i.e. inner-loop).
 					Args:
 						inp: a tuple (inputa, inputb, labela, labelb), where inputa and labela are the inputs and
-							labels used for calculating inner loop gradients and inputa and labela are the inputs and
+							labels used for calculating inner loop gradients and inputb and labelb are the inputs and
 							labels used for evaluating the model after inner updates.
 						reuse: reuse the model parameters or not. Hint: You can just pass its default value to the 
 							forwawrd function
@@ -71,21 +72,43 @@ class MAML:
 				# Note that at each inner update, always use inputa and labela for calculating gradients 
 				# and use inputb and labels for evaluating performance
 				# HINT: you may wish to use tf.gradients()
-				
 				# output, loss, and accuracy of group a before performing inner gradientupdate
 				task_outputa, task_lossa, task_accuracya = None, None, None
+
+				task_outputa = self.forward(inputa, weights, reuse=reuse)
+				task_lossa = self.loss_func(task_outputa, labela)
+				task_accuracya = tf.contrib.metrics.accuracy(labels=tf.argmax(labela, 1),
+															 predictions=tf.argmax(task_outputa, 1))
+				task_outputbs, task_lossesb, task_accuraciesb = [], [], []
+
+				for i in range(num_inner_updates):
+					inner_loss = self.loss_func(self.forward(inputa, weights, reuse=True), labela)
+					grads = tf.gradients(inner_loss, list(weights.values()), stop_gradients=list(weights.values()))
+					for weight_idx, weight_name in enumerate(weights.keys()):
+						weights[weight_name] -= self.inner_update_lr * grads[weight_idx]
+
+					task_outputb = self.forward(inputb, weights, reuse=True)
+					task_lossb = self.loss_func(task_outputb, labela)
+					task_accuracyb = tf.contrib.metrics.accuracy(labels=tf.argmax(labelb, 1),
+																 predictions=tf.argmax(task_outputb, 1))
+					task_outputbs.append(task_outputb)
+					task_lossesb.append(task_lossb)
+					task_accuraciesb.append(task_accuracyb)
+
+
 				# lists to keep track of outputs, losses, and accuracies of group b for each inner_update
 				# where task_outputbs[i], task_lossesb[i], task_accuraciesb[i] are the output, loss, and accuracy
 				# after i+1 inner gradient updates
-				task_outputbs, task_lossesb, task_accuraciesb = [], [], []
 				#############################
 
 				task_output = [task_outputa, task_outputbs, task_lossa, task_lossesb, task_accuracya, task_accuraciesb]
 
 				return task_output
 
+			# output = [ f, []*n_inner, f, []*n_inner, f, [f]*n_inner ]
+			# output = [task_outputa, task_outputbs, task_lossa, task_lossesb, task_accuracya, task_accuraciesb]
 			# to initialize the batch norm vars, might want to combine this, and not run idx 0 twice.
-			unused = task_inner_loop((self.inputa[0], self.inputb[0], self.labela[0], self.labelb[0]), False)
+			unused = task_inner_loop((self.inputa[0], self.inputb[0], self.labela[0], self.labelb[0]), False)  # reuse=False: Create the graph the first time
 			out_dtype = [tf.float32, [tf.float32]*num_inner_updates, tf.float32, [tf.float32]*num_inner_updates]
 			out_dtype.extend([tf.float32, [tf.float32]*num_inner_updates])
 			result = tf.map_fn(task_inner_loop, elems=(self.inputa, self.inputb, self.labela, self.labelb), dtype=out_dtype, parallel_iterations=FLAGS.meta_batch_size)
