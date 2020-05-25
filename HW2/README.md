@@ -3,11 +3,12 @@
 ## TODO
 - [ ] Problem 1: MAML
     - [x] `run_maml.py`
-    - [ ] `task_inner_loop` in `models/maml.py`
+    - [x] `task_inner_loop` in `models/maml.py`
         - [x] Understanding `reuse`: 
             - [TF Doc](https://github.com/tensorflow/docs/blob/master/site/en/r1/guide/variables.md)
             - [What does variable reuse mean in TF](https://medium.com/@hideyuki/what-does-variable-reuse-mean-in-tensorflow-40e86535026b)
-        - [ ] Chealsea Finn's implementation MAML 
+        - [x] Chealsea Finn's implementation MAML 
+        - [x] Commented version of MAML on [TF](https://github.com/dragen1860/MAML-TensorFlow/blob/master/maml.py)
     - [ ] Experiments and explain
     - [ ] Learn separate `inner_update_lr`
 
