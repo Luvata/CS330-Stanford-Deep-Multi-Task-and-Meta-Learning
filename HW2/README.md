@@ -9,6 +9,7 @@
             - [What does variable reuse mean in TF](https://medium.com/@hideyuki/what-does-variable-reuse-mean-in-tensorflow-40e86535026b)
         - [x] Chealsea Finn's implementation MAML 
         - [x] Commented version of MAML on [TF](https://github.com/dragen1860/MAML-TensorFlow/blob/master/maml.py)
+    - [x] Colab [HW1_MAML](https://colab.research.google.com/drive/1jL2-3EAWX4JSxrjwc1y_H2L--kjCx0zS?usp=sharing)
     - [ ] Experiments and explain
     - [ ] Learn separate `inner_update_lr`
 
@@ -19,5 +20,3 @@
 
 - Problem 3: Comparision and Analysis
 
-
-(I'm gonna refactor it in pytorch)
