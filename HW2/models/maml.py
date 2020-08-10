@@ -96,7 +96,7 @@ class MAML:
 				gradients_list = tf.gradients(task_lossa, list(weights.values()))
 				gradients_dict = dict(zip(weights.keys(), gradients_list))
 				fast_weights = dict(zip(weights.keys(),
-										[weights[k] - gradients_dict[k] for k in weights.keys()]))
+										[tf.Variable(weights[k]) - gradients_dict[k] for k in weights.keys()]))
 
 				outer_output = self.forward(inputb, fast_weights, reuse=True)
 				task_outputbs.append(outer_output)

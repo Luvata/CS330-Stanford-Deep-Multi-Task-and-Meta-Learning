@@ -165,6 +165,7 @@ if __name__ == '__main__':
         print(batch_labels.shape)
         train_labels, test_labels = batch_labels[:, :K].reshape(-1, N).argmax(axis=1), \
                                     batch_labels[:, K:].reshape(-1, N).argmax(axis=1)
+        plt.figure(figsize=(10, 6))
         for i in range(N*K):
             plt.subplot(K*2, N, i + 1)
             plt.imshow(train_imgs[i])
