@@ -4,5 +4,5 @@ matplotlib==3.2.0
 torch==1.4.0
 scipy==1.4.1
 imageio==2.8.0
-Pillow==7.0.0
+Pillow==8.3.2
 tensorboard
